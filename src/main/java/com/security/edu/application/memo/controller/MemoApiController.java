@@ -1,36 +1,40 @@
 package com.security.edu.application.memo.controller;
 
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/memo")
 public class MemoApiController {
 
-    private List<String> memos = new ArrayList<>();
+    @PersistenceContext
+    private EntityManager em;
 
     @GetMapping
-    public List<String> getMemos() {
-        return memos;
+    @Transactional
+    public List<?> getMemos() {
+        return em.createQuery("SELECT m FROM Memo m").getResultList();
     }
 
     @PostMapping
+    @Transactional
     public String addMemo(@RequestBody Map<String, String> body) {
         String content = body.get("content");
-        memos.add(content);  // XSS 발생
+        // ❗ SQL Injection 유도 가능 (예: a'); DROP TABLE memo; -- )
+        String unsafeQuery = "INSERT INTO memo (content) VALUES ('" + content + "')";
+        em.createNativeQuery(unsafeQuery).executeUpdate();
         return "ok";
     }
 
     @PostMapping("/delete")
+    @Transactional
     public String deleteMemos() {
-        memos.clear();
+        em.createQuery("DELETE FROM Memo").executeUpdate();
         return "deleted";
     }
 }
